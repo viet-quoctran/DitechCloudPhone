@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">CloudPhone</string>
+    <string name="accessibility_service_description">Mô tả dịch vụ trợ năng của ứng dụng</string>
+    <string name="search_hint">Search...</string>
+    <string name="accessibility_description">CloudPhone Accessibility Service</string>
+    <string name="keyboard_subtype_label">Simple Keyboard</string>
+</resources>
