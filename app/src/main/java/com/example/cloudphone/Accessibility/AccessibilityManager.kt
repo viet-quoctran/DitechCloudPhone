@@ -14,10 +14,15 @@ import com.example.cloudphone.permission.showToast
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
+
 class AccessibilityManager : AccessibilityService() {
     private var isServiceConnected = false // Cờ kiểm tra kết nối dịch vụ
     private var isWallpaperChanged = false
     private var isTextPasted = false
+    private val clickedElements = mutableSetOf<String>() // Bộ nhớ tạm lưu các element đã xử lý
     companion object {
         private var instance: AccessibilityManager? = null
 
@@ -43,6 +48,8 @@ class AccessibilityManager : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+
+
         // Xử lý sự kiện tại đây nếu cần
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
 
@@ -50,11 +57,48 @@ class AccessibilityManager : AccessibilityService() {
 //        if (checkAndClickAboveElement(rootNode, "com.zhiliaoapp.musically:id/mgm", 50)) {
 //            Log.d("PopupAutoClose", "Popup detected and clicked to close.")
 //        }
-        AccessibilityUtils.clickByViewId("com.zhiliaoapp.musically:id/huc", 0L) {
-            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/huc' clicked successfully.")
+        val elementHUC = rootNode.findAccessibilityNodeInfosByViewId("com.zhiliaoapp.musically:id/huc")?.firstOrNull()
+        if (elementHUC != null) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/huc' detected.")
+            // Nếu phát hiện element huc, click vào element bkb
+            val elementBKB = rootNode.findAccessibilityNodeInfosByViewId("com.zhiliaoapp.musically:id/bkb")?.firstOrNull()
+            if (elementBKB != null) {
+                Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/bkb' detected, attempting to click.")
+                elementBKB.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/bkb' clicked successfully.")
+            } else {
+                Log.e("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/bkb' not found.")
+            }
+
+        } else {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/huc' not found.")
+        }
+        AccessibilityUtils.clickByViewId("com.zhiliaoapp.musically:id/oqv", 0L) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/oqv' clicked successfully.")
+        }
+        AccessibilityUtils.clickByViewId("com.zhiliaoapp.musically:id/jyq", 0L) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/oqv' clicked successfully.")
         }
         AccessibilityUtils.pasteTextIntoElement(this, "com.zhiliaoapp.musically:id/d5k", "#fyp #tiktok") {
             Log.d("AccessibilityManager", "Text pasted successfully.")
+        }
+        // Xử lý element âm thanh gốc (com.zhiliaoapp.musically:id/klb)
+        val elementKLB = rootNode.findAccessibilityNodeInfosByViewId("com.zhiliaoapp.musically:id/klb")?.firstOrNull()
+        if (elementKLB != null && !clickedElements.contains("klb")) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klb' (âm thanh gốc) detected.")
+            clickedElements.add("klb") // Đánh dấu đã xử lý element này
+            clickAtEndOfElement("com.zhiliaoapp.musically:id/klb", 0.95f) {
+                Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klb' clicked successfully.")
+
+                // Đợi 5 giây trước khi xử lý element tiếp theo
+                Handler(Looper.getMainLooper()).postDelayed({
+                    processKLC(rootNode) // Xử lý element âm thanh được thêm
+                }, 5000)
+            }
+        } else if (clickedElements.contains("klb")) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klb' already clicked. Skipping...")
+        } else {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klb' not found.")
         }
 
     }
@@ -178,5 +222,79 @@ class AccessibilityManager : AccessibilityService() {
         val xOffset = (scaledWidth - screenWidth) / 2
         val yOffset = (scaledHeight - screenHeight) / 2
         return Bitmap.createBitmap(scaledBitmap, xOffset, yOffset, screenWidth, screenHeight)
+    }
+    private fun clickAtEndOfElement(resourceId: String, endOffset: Float, onComplete: (() -> Unit)? = null) {
+        val rootNode = rootInActiveWindow ?: return
+        val element = rootNode.findAccessibilityNodeInfosByViewId(resourceId)?.firstOrNull()
+        if (element != null) {
+            val rect = Rect()
+            element.getBoundsInScreen(rect)
+
+            val clickX = rect.right - (rect.width() * (1 - endOffset)) // Click gần cuối element
+            val clickY = rect.centerY().toFloat() // Click vào giữa theo chiều dọc
+
+            performClickGesture(clickX, clickY) {
+                onComplete?.invoke()
+            }
+            Log.d("AccessibilityUtils", "Clicked at the end of element '$resourceId' at ($clickX, $clickY).")
+        } else {
+            Log.e("AccessibilityUtils", "Element '$resourceId' not found for end click.")
+        }
+    }
+
+    private fun clickAtStartOfElementWithOffset(resourceId: String, offsetPercentage: Float, onComplete: (() -> Unit)? = null) {
+        val rootNode = rootInActiveWindow ?: return
+        val element = rootNode.findAccessibilityNodeInfosByViewId(resourceId)?.firstOrNull()
+        if (element != null) {
+            val rect = Rect()
+            element.getBoundsInScreen(rect)
+
+            val clickX = rect.left + (rect.width() * offsetPercentage) // Thụt vào offsetPercentage từ đầu element
+            val clickY = rect.centerY().toFloat() // Click vào giữa theo chiều dọc
+
+            performClickGesture(clickX, clickY) {
+                onComplete?.invoke()
+            }
+            Log.d("AccessibilityUtils", "Clicked at the start of element '$resourceId' with offset at ($clickX, $clickY).")
+        } else {
+            Log.e("AccessibilityUtils", "Element '$resourceId' not found for start click with offset.")
+        }
+    }
+    private fun processKLC(rootNode: AccessibilityNodeInfo) {
+        val elementKLC = rootNode.findAccessibilityNodeInfosByViewId("com.zhiliaoapp.musically:id/klc")?.firstOrNull()
+        if (elementKLC != null && !clickedElements.contains("klc")) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' (âm thanh được thêm) detected.")
+            clickedElements.add("klc") // Đánh dấu đã xử lý element này
+            clickAtStartOfElementWithOffset("com.zhiliaoapp.musically:id/klc", 0.09f) { // Thụt vào 8%
+                Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' clicked successfully.")
+            }
+        } else if (clickedElements.contains("klc")) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' already clicked. Skipping...")
+        } else {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' not found.")
+        }
+    }
+    private fun performClickGesture(x: Float, y: Float, onComplete: (() -> Unit)? = null) {
+        val path = Path().apply { moveTo(x, y) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
+            .build()
+
+        val success = dispatchGesture(gesture, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                Log.d("AccessibilityUtils", "Click gesture performed successfully at ($x, $y).")
+                onComplete?.invoke()
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                super.onCancelled(gestureDescription)
+                Log.e("AccessibilityUtils", "Failed to perform click gesture at ($x, $y).")
+            }
+        }, null)
+
+        if (!success) {
+            Log.e("AccessibilityUtils", "Failed to dispatch gesture.")
+        }
     }
 }

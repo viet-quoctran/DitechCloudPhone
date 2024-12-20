@@ -20,13 +20,11 @@ class MainActionTiktok(
 ) {
     private val swipe = Swipe(context, accessibilityService)
     private val userName = "xóa top top luôn"
-    private val upload = Upload(context, accessibilityService)
     private val caseOption = 2
     private val tiktokLink = "https://vt.tiktok.com/ZS6LfUQwy/"
     fun launchTikTok(packageName: String = "com.zhiliaoapp.musically") {
         try {
             AppInfoManager.openAppInfo(context, packageName)
-
             Handler(Looper.getMainLooper()).postDelayed({
                 if (AccessibilityUtils.isAccessibilityServiceReady()) {
                     AppInfoManager.clickForceStopButton(context, "com.zhiliaoapp.musically") {
@@ -43,17 +41,36 @@ class MainActionTiktok(
         }
     }
 
-
-    private fun launchTikTokDirect(packageName: String) {
+    private fun openTikTokWithLink(link: String) {
         try {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                component = ComponentName(packageName, "com.ss.android.ugc.aweme.main.MainActivity")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse(link)
+                setPackage("com.zhiliaoapp.musically") // Specify TikTok package
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-            Log.d("OpenTiktok", "TikTok launched successfully!")
+            Log.d("OpenTikTok", "TikTok opened with link: $link")
 
+            // Đợi một khoảng thời gian để TikTok tải giao diện xong
+            Handler(Looper.getMainLooper()).postDelayed({
+                Upload.clickVideoSound() // TikTok đã sẵn sàng, tiếp tục
+            }, 5000) // Thời gian chờ (điều chỉnh phù hợp, ví dụ: 5 giây)
+        } catch (e: Exception) {
+            Log.e("OpenTikTok", "Error opening TikTok with link: ${e.message}")
+        }
+    }
+    private fun launchTikTokDirect(packageName: String) {
+        try {
+            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                Log.d("OpenTiktok", "TikTok launched successfully using package name: $packageName")
+            } else {
+                Log.e("OpenTiktok", "Unable to find launch intent for package: $packageName")
+            }
+
+            // Thêm logic sau khi mở TikTok
             Handler(Looper.getMainLooper()).postDelayed({
                 processProfileClick()
             }, 5000)
@@ -95,7 +112,10 @@ class MainActionTiktok(
                 1 -> swipe.swipeMultipleTimes(2, 4) {
                     Log.d("checkAndCompareUsername", "Swipe completed successfully.")
                 }
-                2 -> upload.upLoad()
+                2 -> {
+                    Log.d("checkAndCompareUsername", "Preparing to call upload.upLoad() after delay.")
+                    openTikTokWithLink(tiktokLink)
+                }
                 else -> Log.e("checkAndCompareUsername", "Invalid case option: $caseOption")
             }
         } else {
@@ -110,24 +130,6 @@ class MainActionTiktok(
             } else {
                 Log.e("OpenTiktok", "Profile element not found after retries.")
             }
-        }
-    }
-
-
-    fun openTikTokWithLink(context: Context, link: String) {
-        try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse(link)
-                setPackage("com.zhiliaoapp.musically") // Package của TikTok
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            Log.d("OpenTikTok", "TikTok opened with link: $link")
-        } catch (e: Exception) {
-            Log.e("OpenTikTok", "Error opening TikTok with link: ${e.message}")
-            // Nếu không tìm thấy TikTok, mở bằng trình duyệt mặc định
-            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
-            context.startActivity(browserIntent)
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.cloudphone.Accessibility
 
+import android.accessibilityservice.AccessibilityService
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -7,8 +8,14 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Rect
 import android.os.Bundle
+import android.view.MotionEvent
 import kotlin.system.exitProcess
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
+
+
 class AccessibilityUtils {
     companion object {
         // Kiểm tra xem Accessibility Service đã sẵn sàng chưa
@@ -283,7 +290,29 @@ class AccessibilityUtils {
                 onComplete?.invoke()
             }
         }
+        fun clickFirstFrameLayoutInRecyclerView(recyclerViewId: String, onComplete: (() -> Unit)? = null) {
+            val rootNode = getRootNodeSafe() ?: return
+            val recyclerViewNode = rootNode.findAccessibilityNodeInfosByViewId(recyclerViewId)?.firstOrNull()
 
+            if (recyclerViewNode != null) {
+                Log.d("AccessibilityUtils", "RecyclerView found with ID: $recyclerViewId")
+
+                // Tìm FrameLayout[1]/ImageView[1]
+                val firstFrameLayout = recyclerViewNode.getChild(0) // FrameLayout[1]
+                if (firstFrameLayout != null && firstFrameLayout.className == "android.widget.FrameLayout") {
+                    val imageView = firstFrameLayout.getChild(0) // ImageView[1]
+                    if (imageView != null && imageView.className == "android.widget.ImageView") {
+                        Log.d("AccessibilityUtils", "ImageView found inside FrameLayout. Attempting to click.")
+                        imageView.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        onComplete?.invoke()
+                        return
+                    }
+                }
+                Log.e("AccessibilityUtils", "FrameLayout[1]/ImageView[1] not found.")
+            } else {
+                Log.e("AccessibilityUtils", "RecyclerView with ID $recyclerViewId not found.")
+            }
+        }
 
 
 
