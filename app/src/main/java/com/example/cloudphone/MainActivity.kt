@@ -166,7 +166,7 @@ class MainActivity : ComponentActivity() {
 
     private fun showAccessibilityDialogOnce() {
         if (!isAccessibilityDialogShown) {
-            isAccessibilityDialogShown = true
+
             MaterialAlertDialogBuilder(this)
                 .setTitle("Quyền Accessibility")
                 .setMessage("Ứng dụng cần quyền Accessibility để hoạt động. Vui lòng bật quyền này trong cài đặt.")

@@ -25,17 +25,11 @@ class MainActionTiktok(
     fun launchTikTok(packageName: String = "com.zhiliaoapp.musically") {
         try {
             AppInfoManager.openAppInfo(context, packageName)
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (AccessibilityUtils.isAccessibilityServiceReady()) {
-                    AppInfoManager.clickForceStopButton(context, "com.zhiliaoapp.musically") {
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            launchTikTokDirect(packageName)
-                        }, 3000) // Đảm bảo TikTok chỉ mở sau khi Back action hoàn tất
-                    }
-                } else {
-                    Log.e("OpenTiktok", "Accessibility Service is not ready!")
-                }
-            }, 3000) // Chờ 3 giây để App Info load
+            AppInfoManager.clickForceStopButton(context, "com.zhiliaoapp.musically") {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    launchTikTokDirect(packageName)
+                }, 3000) // Đảm bảo TikTok chỉ mở sau khi Back action hoàn tất
+            }
         } catch (e: Exception) {
             Log.e("OpenTiktok", "Error in launchTikTok: ${e.message}")
         }

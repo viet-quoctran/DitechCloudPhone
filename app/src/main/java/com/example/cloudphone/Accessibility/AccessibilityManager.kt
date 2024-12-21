@@ -76,8 +76,11 @@ class AccessibilityManager : AccessibilityService() {
         AccessibilityUtils.clickByViewId("com.zhiliaoapp.musically:id/oqv", 0L) {
             Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/oqv' clicked successfully.")
         }
-        AccessibilityUtils.clickByViewId("com.zhiliaoapp.musically:id/jyq", 0L) {
-            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/oqv' clicked successfully.")
+        val elementJYQ= rootNode.findAccessibilityNodeInfosByViewId("com.zhiliaoapp.musically:id/jyq")?.firstOrNull()
+        if(elementJYQ != null)
+        {
+            elementJYQ.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/jyq' clicked successfully.")
         }
         AccessibilityUtils.pasteTextIntoElement(this, "com.zhiliaoapp.musically:id/d5k", "#fyp #tiktok") {
             Log.d("AccessibilityManager", "Text pasted successfully.")
@@ -265,13 +268,32 @@ class AccessibilityManager : AccessibilityService() {
         if (elementKLC != null && !clickedElements.contains("klc")) {
             Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' (âm thanh được thêm) detected.")
             clickedElements.add("klc") // Đánh dấu đã xử lý element này
-            clickAtStartOfElementWithOffset("com.zhiliaoapp.musically:id/klc", 0.09f) { // Thụt vào 8%
+            clickAtStartOfElementWithOffset("com.zhiliaoapp.musically:id/klc", 0.06f) { // Thụt vào 8%
                 Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' clicked successfully.")
+
+                // Chờ 3 giây trước khi xử lý element tiếp theo
+                Handler(Looper.getMainLooper()).postDelayed({
+                    processFN0(rootNode) // Gọi xử lý element tiếp theo
+                }, 3000)
             }
         } else if (clickedElements.contains("klc")) {
             Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' already clicked. Skipping...")
         } else {
             Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/klc' not found.")
+        }
+    }
+    private fun processFN0(rootNode: AccessibilityNodeInfo) {
+        val elementFN0 = rootNode.findAccessibilityNodeInfosByViewId("com.zhiliaoapp.musically:id/fn0")?.firstOrNull()
+        if (elementFN0 != null && !clickedElements.contains("fn0")) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/fn0' detected.")
+            clickedElements.add("fn0") // Đánh dấu đã xử lý element này
+            AccessibilityUtils.clickByViewId("com.zhiliaoapp.musically:id/fn0") {
+                Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/fn0' clicked successfully.")
+            }
+        } else if (clickedElements.contains("fn0")) {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/fn0' already clicked. Skipping...")
+        } else {
+            Log.d("PopupAutoClose", "Element 'com.zhiliaoapp.musically:id/fn0' not found.")
         }
     }
     private fun performClickGesture(x: Float, y: Float, onComplete: (() -> Unit)? = null) {
