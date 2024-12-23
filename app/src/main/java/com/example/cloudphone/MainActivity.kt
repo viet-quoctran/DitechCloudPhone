@@ -1,11 +1,16 @@
 package com.example.cloudphone
 
+import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -19,7 +24,12 @@ import com.example.cloudphone.permission.showToast
 import com.example.cloudphone.ui.theme.CloudPhoneTheme
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.example.cloudphone.Tiktok.MainActionTiktok
+import com.example.cloudphone.Utils.TokenManager
 import com.example.cloudphone.Accessibility.AccessibilityManager
+import kotlinx.coroutines.*
+import com.example.cloudphone.qrcode.QrCodeScannerActivity
+import com.example.cloudphone.Network.ApiClient
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
 
@@ -27,29 +37,112 @@ class MainActivity : ComponentActivity() {
     private lateinit var keyboardManager: KeyboardManager
     private var isCheckingPermissions = false
     private var isAccessibilityDialogShown = false
-
+    private lateinit var qrCodeLauncher: ActivityResultLauncher<Intent>
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Khởi tạo ActivityResultLauncher
+        qrCodeLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val qrResult = result.data?.getStringExtra("qr_result")
+                if (!qrResult.isNullOrEmpty()) {
+                    // Xử lý mã QR (ví dụ: gửi token lên backend)
+                    handleQrCodeScanned(qrResult)
+                } else {
+                    showToast("Không có mã QR nào được quét.")
+                }
+            } else {
+                showToast("Quét mã QR thất bại hoặc bị hủy.")
+            }
+        }
+        checkToken()
 
         // Initialize PermissionManager and KeyboardManager
         permissionManager = PermissionManager(this)
         keyboardManager = KeyboardManager(this)
 
-        setContent {
-            CloudPhoneTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        onCheckPermissions = { startPermissionCheck() },
-                        onOpenKeyboardSettings = { handleKeyboardSettings() },
-                        onStartAction = { handleStartAction() }
-                    )
+
+    }
+    private fun checkToken() {
+        // Lấy token từ SharedPreferences
+        val token = TokenManager.getToken(this)
+
+        if (token.isNullOrEmpty()) {
+            // Nếu không có token, chuyển đến màn hình quét mã QR
+            showToast("Không tìm thấy token. Hãy quét mã QR để xác thực.")
+            showQRCodeScanner()
+        } else {
+            // Nếu có token, kiểm tra token với API
+            CoroutineScope(Dispatchers.IO).launch {
+                val apiUrl = "http://localhost:8001/api/device/authenticate?token=$token"
+                val response = ApiClient.get(apiUrl)
+                withContext(Dispatchers.Main) {
+                    if (response != null && response.optBoolean("success")) {
+                        setContent {
+                            CloudPhoneTheme {
+                                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                                    MainScreen(
+                                        modifier = Modifier.padding(innerPadding),
+                                        onCheckPermissions = { startPermissionCheck() },
+                                        onOpenKeyboardSettings = { handleKeyboardSettings() },
+                                        onStartAction = { handleStartAction() }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Nếu token không hợp lệ, chuyển đến màn hình quét mã QR
+                        showToast("Token không hợp lệ. Vui lòng quét mã QR.")
+                        showQRCodeScanner()
+                    }
                 }
             }
         }
     }
+    private fun showQRCodeScanner() {
+        val intent = Intent(this, QrCodeScannerActivity::class.java)
+        qrCodeLauncher.launch(intent)
+    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        // Xử lý mã QR hoặc kết quả trả về
+    }
+    private fun handleQrCodeScanned(qrResult: String) {
+        // Giả sử mã QR chỉ chứa token
+        val token = qrResult
+        // Lấy device name từ Build.MODEL
+        val deviceName = getDeviceName()
+        Log.d("devices",deviceName)
+        // Gửi token và device name lên backend
+        sendTokenToBackend(token, deviceName)
+    }
+    private fun getDeviceName(): String {
+        return Build.MODEL ?: "Unknown Device" // Trả về tên thiết bị hoặc "Unknown Device" nếu không xác định được
+    }
+    private fun sendTokenToBackend(token: String, deviceName: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val apiUrl = "http://localhost:8001/api/device/connect"
+            val payload = JSONObject().apply {
+                put("token", token)
+                put("device_name", deviceName)
+            }.toString()
 
+            val response = ApiClient.post(apiUrl, payload)
+            withContext(Dispatchers.Main) {
+                if (response != null && response.optBoolean("success")) {
+                    showToast("Thiết bị đã được xác thực thành công.")
+                    TokenManager.saveToken(this@MainActivity, token)
+                } else {
+                    showToast("Xác thực thất bại. Vui lòng thử lại.")
+                }
+            }
+        }
+    }
+    companion object {
+        const val QR_CODE_REQUEST_CODE = 1001
+    }
     private fun startPermissionCheck() {
         if (!isCheckingPermissions) {
             isCheckingPermissions = true
