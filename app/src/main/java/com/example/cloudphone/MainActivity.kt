@@ -30,6 +30,8 @@ import kotlinx.coroutines.*
 import com.example.cloudphone.qrcode.QrCodeScannerActivity
 import com.example.cloudphone.Network.ApiClient
 import org.json.JSONObject
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 class MainActivity : ComponentActivity() {
 
@@ -76,7 +78,7 @@ class MainActivity : ComponentActivity() {
         } else {
             // Nếu có token, kiểm tra token với API
             CoroutineScope(Dispatchers.IO).launch {
-                val apiUrl = "https://8032-14-241-121-74.ngrok-free.app/api/device/authenticate?token=$token"
+                val apiUrl = "http://103.216.119.245/api/device/authenticate?token=$token"
                 val response = ApiClient.get(apiUrl)
                 withContext(Dispatchers.Main) {
                     if (response != null && response.optBoolean("success")) {
@@ -114,17 +116,17 @@ class MainActivity : ComponentActivity() {
         val token = qrResult
         // Lấy device name từ Build.MODEL
         val deviceName = getDeviceName()
-        Log.d("devices",deviceName)
+        Log.d("devicesqr",token)
         // Gửi token và device name lên backend
         sendTokenToBackend(token, deviceName)
-        ShowMainApp()
     }
     private fun getDeviceName(): String {
-        return Build.MODEL ?: "Unknown Device" // Trả về tên thiết bị hoặc "Unknown Device" nếu không xác định được
+        val deviceName = Build.MODEL ?: "Unknown Device" // Lấy tên thiết bị hoặc trả về giá trị mặc định
+        return URLEncoder.encode(deviceName, StandardCharsets.UTF_8.toString()) // Mã hóa tên thiết bị để sử dụng an toàn trong URL
     }
     private fun sendTokenToBackend(token: String, deviceName: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            val apiUrl = "https://8032-14-241-121-74.ngrok-free.app/api/device/connect"
+            val apiUrl = "http://103.216.119.245/api/device/connect"
             val payload = JSONObject().apply {
                 put("token", token)
                 put("device_name", deviceName)
