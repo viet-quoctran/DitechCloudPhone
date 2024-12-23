@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
         } else {
             // Nếu có token, kiểm tra token với API
             CoroutineScope(Dispatchers.IO).launch {
-                val apiUrl = "http://localhost:8001/api/device/authenticate?token=$token"
+                val apiUrl = "https://8032-14-241-121-74.ngrok-free.app/api/device/authenticate?token=$token"
                 val response = ApiClient.get(apiUrl)
                 withContext(Dispatchers.Main) {
                     if (response != null && response.optBoolean("success")) {
@@ -117,13 +117,14 @@ class MainActivity : ComponentActivity() {
         Log.d("devices",deviceName)
         // Gửi token và device name lên backend
         sendTokenToBackend(token, deviceName)
+        ShowMainApp()
     }
     private fun getDeviceName(): String {
         return Build.MODEL ?: "Unknown Device" // Trả về tên thiết bị hoặc "Unknown Device" nếu không xác định được
     }
     private fun sendTokenToBackend(token: String, deviceName: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            val apiUrl = "http://localhost:8001/api/device/connect"
+            val apiUrl = "https://8032-14-241-121-74.ngrok-free.app/api/device/connect"
             val payload = JSONObject().apply {
                 put("token", token)
                 put("device_name", deviceName)
@@ -131,9 +132,11 @@ class MainActivity : ComponentActivity() {
 
             val response = ApiClient.post(apiUrl, payload)
             withContext(Dispatchers.Main) {
-                if (response != null && response.optBoolean("success")) {
+                val message = response?.optString("message") ?: ""
+                if (message == "Device authenticated successfully") {
                     showToast("Thiết bị đã được xác thực thành công.")
                     TokenManager.saveToken(this@MainActivity, token)
+                    ShowMainApp()
                 } else {
                     showToast("Xác thực thất bại. Vui lòng thử lại.")
                 }
@@ -282,6 +285,21 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
         } catch (e: Exception) {
             showToast("Không thể mở màn hình Accessibility!")
+        }
+    }
+    private fun ShowMainApp()
+    {
+        setContent {
+            CloudPhoneTheme {
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    MainScreen(
+                        modifier = Modifier.padding(innerPadding),
+                        onCheckPermissions = { startPermissionCheck() },
+                        onOpenKeyboardSettings = { handleKeyboardSettings() },
+                        onStartAction = { handleStartAction() }
+                    )
+                }
+            }
         }
     }
 }
