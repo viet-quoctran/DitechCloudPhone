@@ -85,6 +85,32 @@ class AccessibilityUtils {
                 Log.e("AccessibilityUtils", "Unable to find element with description: $description in all windows")
             }
         }
+
+
+        fun findNodeByTextAndId(rootNode: AccessibilityNodeInfo?, text: String, resourceId: String): AccessibilityNodeInfo? {
+            if (rootNode == null) return null
+
+            // Tìm kiếm các node có resourceId khớp
+            val nodesWithId = rootNode.findAccessibilityNodeInfosByViewId(resourceId)
+            if (nodesWithId.isNullOrEmpty()) {
+                Log.e("AccessibilityUtils", "No nodes found with resourceId: $resourceId")
+                return null
+            }
+
+            // Lọc các node có text khớp
+            for (node in nodesWithId) {
+                val nodeText = node.text?.toString()?.trim() ?: ""
+                if (nodeText.equals(text.trim(), ignoreCase = true)) {
+                    Log.d("AccessibilityUtils", "Found matching node with text: $text and resourceId: $resourceId")
+                    return node
+                }
+            }
+
+            Log.e("AccessibilityUtils", "No node found with text: $text and resourceId: $resourceId")
+            return null
+        }
+
+
         fun findNodeInAllWindowsByDescription(description: String): AccessibilityNodeInfo? {
             val service = AccessibilityManager.getInstance() ?: return null
             val windows = service.windows // Lấy danh sách windows từ service
@@ -108,7 +134,6 @@ class AccessibilityUtils {
             val targetNode = findNodeByText(rootNode, text)
             performClickAction(targetNode, text, delayMillis, onComplete)
         }
-
         // Hàm tìm phần tử bằng description
         fun findNodeByDescription(root: AccessibilityNodeInfo?, description: String): AccessibilityNodeInfo? {
             if (root == null) return null
@@ -313,8 +338,6 @@ class AccessibilityUtils {
                 Log.e("AccessibilityUtils", "RecyclerView with ID $recyclerViewId not found.")
             }
         }
-
-
 
     }
 }

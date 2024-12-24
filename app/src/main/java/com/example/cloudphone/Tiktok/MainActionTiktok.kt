@@ -1,12 +1,14 @@
 package com.example.cloudphone.Tiktok
 
-import android.content.ComponentName
+import android.app.Activity
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.accessibility.AccessibilityNodeInfo
 import com.example.cloudphone.Accessibility.AccessibilityManager
 import com.example.cloudphone.Accessibility.AccessibilityUtils
 import com.example.cloudphone.AppInfo.AppInfoManager
@@ -24,17 +26,16 @@ class MainActionTiktok(
     private val tiktokLink = "https://vt.tiktok.com/ZS6LfUQwy/"
     fun launchTikTok(packageName: String = "com.zhiliaoapp.musically") {
         try {
-            AppInfoManager.openAppInfo(context, packageName)
-            AppInfoManager.clickForceStopButton(context, "com.zhiliaoapp.musically") {
+            AppInfoManager.openAppInfo(context, packageName) {
+                // Sau khi "Buộc đóng" hoàn tất, thực hiện mở TikTok
                 Handler(Looper.getMainLooper()).postDelayed({
                     launchTikTokDirect(packageName)
-                }, 3000) // Đảm bảo TikTok chỉ mở sau khi Back action hoàn tất
+                }, 3000) // Đợi thêm 3 giây để đảm bảo giao diện đã đóng hoàn toàn
             }
         } catch (e: Exception) {
             Log.e("OpenTiktok", "Error in launchTikTok: ${e.message}")
         }
     }
-
     private fun openTikTokWithLink(link: String) {
         try {
             val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -101,14 +102,21 @@ class MainActionTiktok(
         val normalizedUserName = CONFIG.normalizeText(userName)
 
         if (normalizedText == normalizedUserName) {
-            processHomeClick()
             when (caseOption) {
                 1 -> swipe.swipeMultipleTimes(2, 4) {
                     Log.d("checkAndCompareUsername", "Swipe completed successfully.")
                 }
                 2 -> {
-                    Log.d("checkAndCompareUsername", "Preparing to call upload.upLoad() after delay.")
-                    openTikTokWithLink(tiktokLink)
+                    Log.d("checkAndCompareUsername", "Preparing to return to home screen before opening App Info.")
+//                    Handler(Looper.getMainLooper()).postDelayed({
+//                        Log.d("checkAndCompareUsername", "Opening App Info for TikTok.")
+////                        AppInfoManager.openAppInfo(context, "com.zhiliaoapp.musically") {
+////                            Handler(Looper.getMainLooper()).postDelayed({
+////                                openTikTokWithLink(tiktokLink)
+////                            }, 3000)
+////                        }
+//                    }, 2000)
+
                 }
                 else -> Log.e("checkAndCompareUsername", "Invalid case option: $caseOption")
             }
@@ -116,6 +124,7 @@ class MainActionTiktok(
             LoginChannel.switchAccount(context, accessibilityService)
         }
     }
+
     private fun processHomeClick() {
         AccessibilityUtils.checkElementWithRetries("com.zhiliaoapp.musically:id/h3h", 5, 2000) { found ->
             if (found) {

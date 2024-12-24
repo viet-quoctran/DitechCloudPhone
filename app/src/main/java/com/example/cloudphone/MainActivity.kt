@@ -60,43 +60,32 @@ class MainActivity : ComponentActivity() {
             }
         }
         checkToken()
-
-        // Initialize PermissionManager and KeyboardManager
         permissionManager = PermissionManager(this)
         keyboardManager = KeyboardManager(this)
-
-
     }
     private fun checkToken() {
         // Lấy token từ SharedPreferences
         val token = TokenManager.getToken(this)
-
         if (token.isNullOrEmpty()) {
             // Nếu không có token, chuyển đến màn hình quét mã QR
             showToast("Không tìm thấy token. Hãy quét mã QR để xác thực.")
             showQRCodeScanner()
         } else {
-            // Nếu có token, kiểm tra token với API
             CoroutineScope(Dispatchers.IO).launch {
                 val apiUrl = "http://103.216.119.245/api/device/authenticate?token=$token"
                 val response = ApiClient.get(apiUrl)
                 withContext(Dispatchers.Main) {
-                    if (response != null && response.optBoolean("success")) {
-                        setContent {
-                            CloudPhoneTheme {
-                                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                                    MainScreen(
-                                        modifier = Modifier.padding(innerPadding),
-                                        onCheckPermissions = { startPermissionCheck() },
-                                        onOpenKeyboardSettings = { handleKeyboardSettings() },
-                                        onStartAction = { handleStartAction() }
-                                    )
-                                }
-                            }
+                    if (response != null) {
+                        val device = response.optJSONObject("data")?.optJSONObject("device")
+                        val serverToken = device?.optString("token")
+                        if (serverToken == token) {
+                            showToast("Login thành công!")
+                            ShowMainApp()
+                        } else {
+                            showToast("Token không hợp lệ. Vui lòng quét mã QR.")
+                            showQRCodeScanner()
                         }
                     } else {
-                        // Nếu token không hợp lệ, chuyển đến màn hình quét mã QR
-                        showToast("Token không hợp lệ. Vui lòng quét mã QR.")
                         showQRCodeScanner()
                     }
                 }
@@ -199,14 +188,12 @@ class MainActivity : ComponentActivity() {
             else
             {
                 val accessibilityManager = AccessibilityManager()
-
                 val mainActionTiktok = MainActionTiktok(this, accessibilityManager)
                 mainActionTiktok.launchTikTok()
             }
 
         }
     }
-
     private fun showPermissionRequiredDialog() {
         MaterialAlertDialogBuilder(this)
             .setTitle("Quyền cần thiết")
@@ -323,12 +310,6 @@ fun MainScreen(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(text = "Permissions")
-            }
-            Button(
-                onClick = onOpenKeyboardSettings,
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(text = "Keyboard")
             }
             Button(
                 onClick = onStartAction,

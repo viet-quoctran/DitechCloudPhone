@@ -2,6 +2,7 @@ package com.example.cloudphone.Utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 
 object TokenManager {
 
@@ -21,7 +22,9 @@ object TokenManager {
 
     // Lấy token từ SharedPreferences
     fun getToken(context: Context): String? {
-        return getSharedPreferences(context).getString(TOKEN_KEY, null)
+        val token = getSharedPreferences(context).getString(TOKEN_KEY, null)
+        Log.d("tokenzzz",token ?: "null")
+        return token
     }
 
     // Xóa token
