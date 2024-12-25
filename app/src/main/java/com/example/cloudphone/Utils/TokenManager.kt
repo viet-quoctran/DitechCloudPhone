@@ -23,7 +23,7 @@ object TokenManager {
     // Lấy token từ SharedPreferences
     fun getToken(context: Context): String? {
         val token = getSharedPreferences(context).getString(TOKEN_KEY, null)
-        Log.d("tokenzzz",token ?: "null")
+        Log.d("token",token ?: "null")
         return token
     }
 

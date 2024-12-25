@@ -16,12 +16,6 @@ class Swipe(
         val totalSwipes = Random.nextInt(minTimes, maxTimes + 1) // Chọn số lần swipe ngẫu nhiên
         var currentSwipe = 0
 
-        if (!AccessibilityUtils.isAccessibilityServiceReady()) {
-            Log.e("OpenTiktok", "Accessibility Service is not ready! Cannot perform swipes.")
-            onComplete() // Gọi callback ngay lập tức nếu Service không sẵn sàng
-            return
-        }
-
         fun swipeAndPause() {
             if (currentSwipe < totalSwipes) {
                 currentSwipe++

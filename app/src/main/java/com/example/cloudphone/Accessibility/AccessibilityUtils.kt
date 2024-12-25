@@ -18,20 +18,6 @@ import android.graphics.Path
 
 class AccessibilityUtils {
     companion object {
-        // Kiểm tra xem Accessibility Service đã sẵn sàng chưa
-        fun isAccessibilityServiceReady(): Boolean {
-            val service = AccessibilityManager.getInstance()
-            return if (service == null) {
-                Log.e("AccessibilityUtils", "AccessibilityManager instance is null!")
-                false
-            } else if (!service.isServiceReady()) {
-                Log.e("AccessibilityUtils", "Accessibility Service is not ready!")
-                false
-            } else {
-                Log.d("AccessibilityUtils", "Accessibility Service is ready.")
-                true
-            }
-        }
 
         // Lấy root node an toàn
         fun getRootNodeSafe(): AccessibilityNodeInfo? {

@@ -32,7 +32,7 @@ import com.example.cloudphone.Network.ApiClient
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-
+import javax.net.ssl.*
 class MainActivity : ComponentActivity() {
 
     private lateinit var permissionManager: PermissionManager
@@ -72,12 +72,14 @@ class MainActivity : ComponentActivity() {
             showQRCodeScanner()
         } else {
             CoroutineScope(Dispatchers.IO).launch {
-                val apiUrl = "http://103.216.119.245/api/device/authenticate?token=$token"
+                val apiUrl = "https://deca8.com/api/device/authenticate?token=$token"
                 val response = ApiClient.get(apiUrl)
                 withContext(Dispatchers.Main) {
                     if (response != null) {
                         val device = response.optJSONObject("data")?.optJSONObject("device")
+                        val channels = response.optJSONObject("data")?.optJSONArray("channels")
                         val serverToken = device?.optString("token")
+                        Log.d("channels",channels.toString())
                         if (serverToken == token) {
                             showToast("Login thành công!")
                             ShowMainApp()
@@ -115,12 +117,13 @@ class MainActivity : ComponentActivity() {
     }
     private fun sendTokenToBackend(token: String, deviceName: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            val apiUrl = "http://103.216.119.245/api/device/connect"
+            val apiUrl = "https://deca8.com/api/device/connect"
             val payload = JSONObject().apply {
                 put("token", token)
                 put("device_name", deviceName)
             }.toString()
-
+            Log.d("API Debug", "URL: $apiUrl")
+            Log.d("API Debug", "Payload: $payload")
             val response = ApiClient.post(apiUrl, payload)
             withContext(Dispatchers.Main) {
                 val message = response?.optString("message") ?: ""
@@ -246,7 +249,14 @@ class MainActivity : ComponentActivity() {
             Settings.Secure.ACCESSIBILITY_ENABLED,
             0
         )
-        return accessibilityEnabled == 1 && enabledServices?.contains(service) == true
+        val isEnabled = accessibilityEnabled == 1 && enabledServices?.contains(service) == true
+        if (isEnabled) {
+            Log.d("AccessibilityCheck", "Accessibility Service is enabled.")
+        } else {
+            Log.d("AccessibilityCheck", "Accessibility Service is disabled.")
+        }
+
+        return isEnabled
     }
 
     private fun showAccessibilityDialogOnce() {

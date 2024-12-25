@@ -107,6 +107,7 @@ class MainActionTiktok(
                     Log.d("checkAndCompareUsername", "Swipe completed successfully.")
                 }
                 2 -> {
+
                     Log.d("checkAndCompareUsername", "Preparing to return to home screen before opening App Info.")
 //                    Handler(Looper.getMainLooper()).postDelayed({
 //                        Log.d("checkAndCompareUsername", "Opening App Info for TikTok.")
@@ -116,7 +117,10 @@ class MainActionTiktok(
 ////                            }, 3000)
 ////                        }
 //                    }, 2000)
-
+                    System.exit(0)
+                    AppInfoManager.openAppInfo(context, "com.zhiliaoapp.musically"){
+                        Log.d("zxc","zzxc")
+                    }
                 }
                 else -> Log.e("checkAndCompareUsername", "Invalid case option: $caseOption")
             }
