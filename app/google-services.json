@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "836959224716",
+    "project_id": "ditech-app-notification",
+    "storage_bucket": "ditech-app-notification.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836959224716:android:9a059dc699562ed842cca9",
+        "android_client_info": {
+          "package_name": "com.ditech.cloudphone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBbUMEOuXnwGky_Q3I1Hj1dd9EB64voDI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836959224716:android:c68cfe37d0492d5f42cca9",
+        "android_client_info": {
+          "package_name": "com.example.firebase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBbUMEOuXnwGky_Q3I1Hj1dd9EB64voDI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
