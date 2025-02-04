@@ -5,7 +5,12 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import android.content.Context
+import android.graphics.Rect
 import android.os.Bundle
+import com.ditech.cloudphone.AppInfo.AppInfoManager
+import com.ditech.cloudphone.Network.ApiClient
+import com.ditech.cloudphone.Utils.CONFIG
+import com.ditech.cloudphone.Utils.TokenManager
 
 
 class AccessibilityUtils {
@@ -107,7 +112,6 @@ class AccessibilityUtils {
             }
             return null
         }
-        // Click vào phần tử bằng text
         fun clickByText(text: String, delayMillis: Long = 0L, onComplete: (() -> Unit)? = null) {
             val rootNode = getRootNodeSafe() ?: return
             val targetNode = findNodeByText(rootNode, text)
@@ -116,7 +120,7 @@ class AccessibilityUtils {
         // Hàm tìm phần tử bằng description
         fun findNodeByDescription(root: AccessibilityNodeInfo?, description: String): AccessibilityNodeInfo? {
             if (root == null) return null
-            if (root.contentDescription == description) {
+            if (root.text == description || root.contentDescription == description) {
                 Log.d("AccessibilityUtils", "Node found: $description")
                 return root
             }
@@ -133,10 +137,14 @@ class AccessibilityUtils {
         }
 
         // Hàm tìm phần tử bằng text
-        fun findNodeByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        fun findNodeByText(root: AccessibilityNodeInfo?, text: String): AccessibilityNodeInfo? {
+            if (root == null) return null // Kiểm tra null trước
             if (root.text?.toString() == text) return root
             for (i in 0 until root.childCount) {
-                findNodeByText(root.getChild(i), text)?.let { return it }
+                val child = root.getChild(i) // Lấy node con
+                if (child != null) { // Kiểm tra node con có null không
+                    findNodeByText(child, text)?.let { return it }
+                }
             }
             return null
         }
@@ -210,14 +218,16 @@ class AccessibilityUtils {
             Log.e("AccessibilityUtils", "No node found with resourceId: $resourceId and description: $description")
             return null
         }
-        fun clickByViewIdAndDescription(viewId: String, description: String, delayMillis: Long = 0L, onComplete: (() -> Unit)? = null) {
-            val rootNode = getRootNodeSafe() ?: return
+        fun clickByViewIdAndDescription(viewId: String, description: String, delayMillis: Long = 0L, onComplete: (() -> Unit)? = null): Boolean {
+            val rootNode = getRootNodeSafe() ?: return false
             val targetNode = findNodeByResourceIdAndDescription(rootNode, viewId, description)
-            if (targetNode != null) {
+            return if (targetNode != null) {
                 Log.d("AccessibilityUtils", "Attempting to click node with resourceId: $viewId and description: $description")
                 performClickAction(targetNode, "$viewId with description $description", delayMillis, onComplete)
+                true
             } else {
                 Log.e("AccessibilityUtils", "Unable to find node with resourceId: $viewId and description: $description")
+                false
             }
         }
         fun clickFirstVideoInRecyclerView(recyclerViewId: String, onComplete: () -> Unit) {
@@ -249,74 +259,308 @@ class AccessibilityUtils {
             textToPaste: String,
             onComplete: (() -> Unit)? = null
         ) {
-            val rootNode = AccessibilityManager.getInstance()?.rootInActiveWindow ?: return
-
-            val targetNode = rootNode.findAccessibilityNodeInfosByViewId(viewId)?.firstOrNull()
-
+            val rootNode = getRootNodeSafe()
+            val targetNode = rootNode?.findAccessibilityNodeInfosByViewId(viewId)?.firstOrNull()
             if (targetNode != null && targetNode.isEditable) {
-                Log.d("AccessibilityUtils", "Editable node found with ID: $viewId")
-
-                // Đảm bảo focus vào trường nhập liệu và click vào nó
                 val focusResult = targetNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
                 val clickResult = targetNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-
-                Log.d(
-                    "AccessibilityUtils",
-                    "Focus result: $focusResult, Click result: $clickResult for element with ID: $viewId"
-                )
-
-                // Thêm delay để đảm bảo thao tác focus và click được hoàn tất trước khi set text
                 Handler(Looper.getMainLooper()).postDelayed({
-                    // Sử dụng ACTION_SET_TEXT để đặt văn bản trực tiếp
                     val arguments = Bundle().apply {
                         putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, textToPaste)
                     }
                     val setTextResult = targetNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
 
                     if (setTextResult) {
-                        Log.d("AccessibilityUtils", "Text set directly into element with ID: $viewId")
-
-                        // Gọi clickByViewId sau khi set text thành công
-                        val clickAfterPasteResult = clickByViewId("com.zhiliaoapp.musically:id/jfv")
-                        Log.d(
-                            "AccessibilityUtils",
-                            "Click after paste result: $clickAfterPasteResult for element with ID: com.zhiliaoapp.musically:id/jfv"
-                        )
-
-                        onComplete?.invoke() // Gọi callback nếu có
+                        onComplete?.invoke()
                     } else {
                         Log.e("AccessibilityUtils", "Failed to set text for element with ID: $viewId")
                         onComplete?.invoke()
                     }
-                }, 500) // Thêm 500ms delay để đảm bảo hành động trước đó hoàn thành
+                }, 500)
             } else {
                 Log.e("AccessibilityUtils", "Editable node not found or node is not editable for ID: $viewId")
                 onComplete?.invoke()
             }
         }
-        fun clickFirstFrameLayoutInRecyclerView(recyclerViewId: String, onComplete: (() -> Unit)? = null) {
+        fun clickFirstFrameLayoutInRecyclerView(context: Context,recyclerViewId: String, onComplete: (() -> Unit)? = null) {
             val rootNode = getRootNodeSafe() ?: return
             val recyclerViewNode = rootNode.findAccessibilityNodeInfosByViewId(recyclerViewId)?.firstOrNull()
 
             if (recyclerViewNode != null) {
                 Log.d("AccessibilityUtils", "RecyclerView found with ID: $recyclerViewId")
-
-                // Tìm FrameLayout[1]/ImageView[1]
-                val firstFrameLayout = recyclerViewNode.getChild(0) // FrameLayout[1]
-                if (firstFrameLayout != null && firstFrameLayout.className == "android.widget.FrameLayout") {
+                val firstFrameLayout = recyclerViewNode.getChild(0)
+                if (firstFrameLayout != null &&
+                    (firstFrameLayout.className == "android.widget.FrameLayout" ||
+                            firstFrameLayout.className == "android.widget.ImageView")) {
                     val imageView = firstFrameLayout.getChild(0) // ImageView[1]
                     if (imageView != null && imageView.className == "android.widget.ImageView") {
-                        Log.d("AccessibilityUtils", "ImageView found inside FrameLayout. Attempting to click.")
                         imageView.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                         onComplete?.invoke()
                         return
                     }
                 }
-                Log.e("AccessibilityUtils", "FrameLayout[1]/ImageView[1] not found.")
+                ApiClient.sendNotiToTelegram("1", TokenManager.getToken(context),context)
             } else {
-                Log.e("AccessibilityUtils", "RecyclerView with ID $recyclerViewId not found.")
+                ApiClient.sendNotiToTelegram("2", TokenManager.getToken(context),context)
             }
         }
+        fun findElementByClassName(node: AccessibilityNodeInfo, className: String): AccessibilityNodeInfo? {
+            if (node.className == className) {
+                return node // Trả về phần tử nếu className khớp
+            }
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                val result = findElementByClassName(child, className)
+                if (result != null) return result
+            }
+            return null // Không tìm thấy
+        }
+        fun pasteTextUsingClipboard(context: Context, text: String, onComplete: (() -> Unit)? = null) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
 
+            // Xóa clipboard cũ
+            clearClipboard(context)
+
+            // Sao chép nội dung mới vào clipboard
+            val clip = android.content.ClipData.newPlainText("label", text)
+            clipboard.setPrimaryClip(clip)
+            Log.d("ClipboardCheck", "Text '$text' copied to clipboard.")
+
+            // Chờ hệ thống đồng bộ và thực hiện hành động paste
+            Handler(Looper.getMainLooper()).postDelayed({
+                val rootNode = getRootNodeSafe() ?: run {
+                    Log.e("ClipboardCheck", "Root node is null.")
+                    onComplete?.invoke()
+                    return@postDelayed
+                }
+                val focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+
+                if (focusedNode != null) {
+                    // Focus vào node trước khi paste
+                    val focusResult = focusedNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    Log.d("ClipboardCheck", "Focus result: $focusResult")
+
+                    // Thực hiện paste
+                    val arguments = Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                    }
+                    val setTextResult = focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+                    if (setTextResult) {
+                        clickSearchProduct(context)
+                    } else {
+                        Log.e("ClipboardCheck", "Failed to set text '$text' using ACTION_SET_TEXT.")
+                    }
+                    onComplete?.invoke()
+                } else {
+                    Log.e("ClipboardCheck", "No focused node found for pasting text.")
+                    onComplete?.invoke()
+                }
+            }, 500) // Tăng thời gian chờ lên 500ms để đảm bảo clipboard đồng bộ
+        }
+        fun clickSearchProduct(context: Context) {
+            val accessibilityService = SaveInstance.accessibilityService
+            if (accessibilityService != null) {
+                val windows = accessibilityService.windows // Lấy danh sách tất cả các windows hiện có
+                for (window in windows) {
+                    val rootNode = window.root // Lấy root node của từng window
+                    if (rootNode != null) {
+                        // Tìm node có resourceId là "com.google.android.inputmethod.latin:id/key_pos_ime_action"
+                        val searchNode = rootNode.findAccessibilityNodeInfosByViewId("com.google.android.inputmethod.latin:id/key_pos_ime_action")?.firstOrNull()
+                        if (searchNode != null) {
+                            // Thực hiện click
+                            val clickResult = searchNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            if (clickResult) {
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    clickAddProduct(context)
+                                },5000)
+
+                            } else {
+                                Log.e("ClickSearch", "Failed to click on node with resourceId 'com.google.android.inputmethod.latin:id/key_pos_ime_action'.")
+                            }
+                            break // Dừng sau khi tìm thấy và click
+                        } else {
+                            Log.d("ClickSearch", "Node with resourceId 'com.google.android.inputmethod.latin:id/key_pos_ime_action' not found.")
+                        }
+                    } else {
+                        Log.d("ClickSearch", "Root node is null for one of the windows.")
+                    }
+                }
+            } else {
+                Log.e("AccessibilityUtils", "AccessibilityService instance is null.")
+            }
+        }
+        fun clickDoneProduct(context: Context) {
+            val accessibilityService = SaveInstance.accessibilityService
+            if (accessibilityService != null) {
+                val windows = accessibilityService.windows // Lấy danh sách tất cả các windows hiện có
+                for (window in windows) {
+                    val rootNode = window.root // Lấy root node của từng window
+                    if (rootNode != null) {
+                        // Tìm node có resourceId là "com.google.android.inputmethod.latin:id/key_pos_ime_action"
+                        val searchNode = rootNode.findAccessibilityNodeInfosByViewId("com.google.android.inputmethod.latin:id/key_pos_ime_action")?.firstOrNull()
+                        if (searchNode != null) {
+                            // Thực hiện click
+                            val clickResult = searchNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            if (clickResult) {
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    clickPostVideo(context)
+                                },5000)
+
+                            } else {
+                                Log.e("ClickSearch", "Failed to click on node with resourceId 'com.google.android.inputmethod.latin:id/key_pos_ime_action'.")
+                            }
+                            break // Dừng sau khi tìm thấy và click
+                        } else {
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                clickPostVideo(context)
+                            },10000)
+                        }
+                    } else {
+                        Log.d("ClickSearch", "Root node is null for one of the windows.")
+                    }
+                }
+            } else {
+                Log.e("AccessibilityUtils", "AccessibilityService instance is null.")
+            }
+        }
+        fun clearClipboard(context: Context) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val emptyClip = android.content.ClipData.newPlainText("", "") // Tạo một Clipboard trống
+            clipboard.setPrimaryClip(emptyClip)
+            Log.d("ClipboardCheck", "Clipboard has been cleared.")
+        }
+
+        fun checkClipboardContent(context: Context) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val primaryClip = clipboard.primaryClip
+            if (primaryClip != null && primaryClip.itemCount > 0) {
+                val text = primaryClip.getItemAt(0).text
+                Log.d("ClipboardCheck", "Current clipboard content: $text")
+            } else {
+                Log.d("ClipboardCheck", "Clipboard is empty.")
+            }
+        }
+        fun clickAddProduct(context: Context)
+        {
+            val accessibilityService = SaveInstance.accessibilityService
+            if (accessibilityService != null) {
+                val windows = accessibilityService.windows // Lấy danh sách tất cả các windows hiện có
+                for (window in windows) {
+                    val rootNode = window.root // Lấy root node của từng window
+                    if (rootNode != null) {
+                        // Duyệt qua tất cả các phần tử để tìm className và text
+                        traverseNode(rootNode) { node ->
+                            if (node.className == "com.lynx.tasm.behavior.ui.view.UIView") {
+                                // Lấy tọa độ của phần tử
+                                val rect = android.graphics.Rect()
+                                node.getBoundsInScreen(rect)
+                                val clickX = rect.centerX().toFloat()
+                                val clickY = rect.centerY().toFloat()
+                                // Thực hiện click vào tọa độ
+                                accessibilityService.performClickGesture(clickX, clickY) {
+                                    Handler(Looper.getMainLooper()).postDelayed({
+                                        clickDoneProduct(context)
+                                    },5000)
+                                }
+                                return@traverseNode // Dừng sau khi tìm thấy và click
+                            }
+                        }
+                    }
+                }
+            } else {
+                Log.e("AccessibilityUtils", "AccessibilityService instance is null.")
+            }
+        }
+        fun clickPostVideo(context: Context) {
+            val accessibilityService = SaveInstance.accessibilityService
+            if (accessibilityService != null) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    val rootNode = accessibilityService.rootInActiveWindow
+                    if (rootNode != null) {
+                        // Tìm node dựa trên cấu trúc XPath-lite
+                        val targetNode = findNodeByXPathLite(rootNode)
+                        if (targetNode != null) {
+                            val rect = Rect()
+                            targetNode.getBoundsInScreen(rect)
+                            val clickX = rect.centerX().toFloat()
+                            val clickY = rect.centerY().toFloat()
+
+                            // Thực hiện click vào node được tìm thấy
+                            accessibilityService.performClickGesture(clickX, clickY) {
+                                clickPost(context)
+                            }
+                        } else {
+                            Log.e("XPathLiteClick", "Không tìm thấy node với XPath-lite.")
+                        }
+                    } else {
+                        Log.e("XPathLiteClick", "Root node không tồn tại.")
+                    }
+                }, 3000) // Delay tuỳ chỉnh nếu cần
+            } else {
+                Log.e("AccessibilityUtils", "AccessibilityService instance is null.")
+            }
+        }
+        fun clickPost(context: Context) {
+            // Lấy instance của AccessibilityManager
+            clickByViewId(CONFIG.ELEMENT_POST_VIDEO) {
+                ApiClient.deleteVideoWithApiFromStorage()
+                Handler(Looper.getMainLooper()).postDelayed({
+                    // Mở ứng dụng CloudPhone sau khi hoàn tất
+                    AppInfoManager.openAppWithText(context, "CloudPhone", CONFIG.PACKAGE_NAME_TIKTOK) {
+                        // Xóa video bằng API
+                        Log.d("Status","Da dang thanh cong")
+                    }
+                }, 10000)
+            }
+        }
+        fun findNodeByXPathLite(rootNode: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+            // Bước 1: Tìm node `com.zhiliaoapp.musically:id/qb`
+            val parentNode = rootNode.findAccessibilityNodeInfosByViewId("com.zhiliaoapp.musically:id/qb")?.firstOrNull()
+            if (parentNode == null) {
+                Log.e("XPathLiteFind", "Không tìm thấy node `com.zhiliaoapp.musically:id/qb`.")
+                return null
+            }
+
+            // Bước 2: Truy cập các FrameLayout theo thứ tự
+            val frameLayout1 = parentNode.getChild(0)?.getChild(0) // Truy cập FrameLayout[1]/FrameLayout[1]
+            if (frameLayout1 == null) {
+                Log.e("XPathLiteFind", "Không tìm thấy FrameLayout[1]/FrameLayout[1].")
+                return null
+            }
+
+            // Bước 3: Lấy phần tử FlattenUIText[11]
+            var flattenUITextNode: AccessibilityNodeInfo? = null
+            var count = 0
+            for (i in 0 until frameLayout1.childCount) {
+                val child = frameLayout1.getChild(i)
+                if (child?.className == "com.lynx.tasm.behavior.ui.text.FlattenUIText") {
+                    count++
+                    if (count == 11) {
+                        flattenUITextNode = child
+                        break
+                    }
+                } else if (child?.className == "com.lynx.tasm.behavior.ui.view.UIView") {
+                    count++
+                    if (count == 1) {
+                        flattenUITextNode = child
+                        break
+                    }
+                }
+            }
+
+            if (flattenUITextNode == null) {
+                Log.e("XPathLiteFind", "Không tìm thấy FlattenUIText[11].")
+            }
+            return flattenUITextNode
+        }
+        private fun traverseNode(node: AccessibilityNodeInfo, action: (AccessibilityNodeInfo) -> Unit) {
+            action(node)
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                traverseNode(child, action)
+            }
+        }
     }
+
+
 }

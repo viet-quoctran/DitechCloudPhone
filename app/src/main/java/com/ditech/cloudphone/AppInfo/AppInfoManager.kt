@@ -3,58 +3,64 @@ package com.ditech.cloudphone.AppInfo
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
+import com.ditech.cloudphone.Accessibility.AccessibilityManager
 import com.ditech.cloudphone.Accessibility.AccessibilityUtils
 import com.ditech.cloudphone.Accessibility.SaveInstance
+import com.ditech.cloudphone.Network.ApiClient
+import com.ditech.cloudphone.Utils.CONFIG
+import com.ditech.cloudphone.Utils.TokenManager
 
 class AppInfoManager {
     companion object {
-        private val tiktokLink = "https://vt.tiktok.com/ZS6LfUQwy/"
-        fun openAppInfoWithRecent(context: Context, packageName: String,onComplete: () -> Unit) {
+        fun openAppWithText(
+            context: Context,
+            appName: String,
+            packageName: String? = null,
+            onComplete: () -> Unit
+        ) {
             val accessibilityService = SaveInstance.accessibilityService
             if (accessibilityService == null) {
-                Log.e("OpenAppInfo", "AccessibilityManager instance is null. Cannot perform action.")
-                return
+                ApiClient.sendNotiToTelegram(CONFIG.MESSAGE_ACCESSIBILITY_DISABLE,TokenManager.getToken(context),context)
+                System.exit(0)
             }
 
             // Thực hiện hành động GLOBAL_ACTION_RECENTS để bật màn hình đa nhiệm
-            val success = accessibilityService.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
-            if (success) {
-                Log.d("OpenAppInfo", "Recent apps screen opened successfully.")
+            val success = accessibilityService?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
+            if (success != null) {
                 // Đợi 2 giây để màn hình đa nhiệm xuất hiện
                 Handler(Looper.getMainLooper()).postDelayed({
                     // Lấy root node
                     val rootNode = AccessibilityUtils.getRootNodeSafe()
                     if (rootNode != null) {
-                        // Tìm element với ID "com.android.systemui:id/recents_view"
-                        val recentsView = rootNode.findAccessibilityNodeInfosByViewId("com.android.systemui:id/recents_view")?.firstOrNull()
-                        if (recentsView != null) {
-                            // Tìm TextView có text là "Thông tin ứng dụng"
-                            val targetTextView = findTextViewByText(recentsView, "Thông tin ứng dụng")
-                            if (targetTextView != null) {
-                                Log.d("OpenAppInfo", "Found TextView with text 'Thông tin ứng dụng'. Searching for parent...")
+                        // Tìm TextView với text là appName
+                        val targetTextView = findTextViewByText(rootNode, appName)
+                        if (targetTextView != null) {
+                            // Lấy tọa độ (rect bounds) của TextView
+                            val rect = Rect()
+                            targetTextView.getBoundsInScreen(rect)
+                            val clickX = rect.centerX().toFloat()
+                            val clickY = rect.centerY().toFloat()
 
-                                // Tìm FrameLayout là cha của FrameLayout chứa TextView
-                                val parentFrameLayout = findParentFrameLayoutOfFrameLayout(targetTextView)
-                                if (parentFrameLayout != null) {
-                                    Log.d("OpenAppInfo", "Found parent FrameLayout. Performing action...")
-                                    parentFrameLayout.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            // Thực hiện thao tác click vào tọa độ đã lấy
+                            accessibilityService.performClickGesture(clickX, clickY) {
+                                // Nếu packageName được cung cấp, thực hiện thêm hành động clickForceStopButton
+                                if (appName == "App info" && packageName != null) {
                                     Handler(Looper.getMainLooper()).postDelayed({
-                                        clickForceStopButton(context, packageName, 0, 5, onComplete,skipBack = true)
+                                        clickForceStopButton(context, packageName, 0, 5, onComplete, skipBack = true)
                                     }, 3000)
                                 } else {
-                                    Log.e("OpenAppInfo", "Parent FrameLayout not found for TextView.")
+                                    onComplete()
                                 }
-                            } else {
-                                Log.e("OpenAppInfo", "TextView with text 'Thông tin ứng dụng' not found.")
                             }
                         } else {
-                            Log.e("OpenAppInfo", "Element with ID 'com.android.systemui:id/recents_view' not found.")
+                            Log.e("OpenAppInfo", "TextView with text '$appName' not found.")
                         }
                     } else {
                         Log.e("OpenAppInfo", "Root node is null. Cannot search for elements.")
@@ -64,57 +70,9 @@ class AppInfoManager {
                 Log.e("OpenAppInfo", "Failed to open recent apps screen.")
             }
         }
-        fun openTiktokWithRecent(context: Context, packageName: String,onComplete: () -> Unit) {
-            val accessibilityService = SaveInstance.accessibilityService
-            if (accessibilityService == null) {
-                Log.e("OpenAppInfo", "AccessibilityManager instance is null. Cannot perform action.")
-                return
-            }
-
-            // Thực hiện hành động GLOBAL_ACTION_RECENTS để bật màn hình đa nhiệm
-            val success = accessibilityService.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
-            if (success) {
-                Log.d("OpenAppInfo", "Recent apps screen opened successfully.")
-                // Đợi 2 giây để màn hình đa nhiệm xuất hiện
-                Handler(Looper.getMainLooper()).postDelayed({
-                    // Lấy root node
-                    val rootNode = AccessibilityUtils.getRootNodeSafe()
-                    if (rootNode != null) {
-                        // Tìm element với ID "com.android.systemui:id/recents_view"
-                        val recentsView = rootNode.findAccessibilityNodeInfosByViewId("com.android.systemui:id/recents_view")?.firstOrNull()
-                        if (recentsView != null) {
-                            // Tìm TextView có text là "Thông tin ứng dụng"
-                            val targetTextView = findTextViewByText(recentsView, "TikTok")
-                            if (targetTextView != null) {
-                                Log.d("OpenAppInfo", "Found TextView with text 'Thông tin ứng dụng'. Searching for parent...")
-
-                                // Tìm FrameLayout là cha của FrameLayout chứa TextView
-                                val parentFrameLayout = findParentFrameLayoutOfFrameLayout(targetTextView)
-                                if (parentFrameLayout != null) {
-                                    Log.d("OpenAppInfo", "Found parent FrameLayout. Performing action...")
-                                    parentFrameLayout.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-
-
-                                } else {
-                                    Log.e("OpenAppInfo", "Parent FrameLayout not found for TextView.")
-                                }
-                            } else {
-                                Log.e("OpenAppInfo", "TextView with text 'Thông tin ứng dụng' not found.")
-                            }
-                        } else {
-                            Log.e("OpenAppInfo", "Element with ID 'com.android.systemui:id/recents_view' not found.")
-                        }
-                    } else {
-                        Log.e("OpenAppInfo", "Root node is null. Cannot search for elements.")
-                    }
-                }, 2000)
-            } else {
-                Log.e("OpenAppInfo", "Failed to open recent apps screen.")
-            }
-        }
-
         // Hàm đệ quy để tìm TextView có nội dung cụ thể
         fun findTextViewByText(node: AccessibilityNodeInfo, targetText: String): AccessibilityNodeInfo? {
+            Log.d("FindTextView", "Searching for TextView with text: $targetText")
             if (node.className == "android.widget.TextView" && node.text?.toString() == targetText) {
                 return node
             }
@@ -192,18 +150,33 @@ class AppInfoManager {
                         clickForceStopButton(context, packageName, retryCount + 1, maxRetries, onComplete, skipBack)
                     }, 3000)
                 } else {
-                    Log.e("OpenTiktok", "Max retries reached. Unable to click 'Buộc đóng' button.")
+                    ApiClient.sendNotiToTelegram(CONFIG.MESSAGE_BUTTON_FORCE_STOP,TokenManager.getToken(context), context)
                 }
                 return
             }
 
             // Tìm nút "Buộc đóng"
-            val forceStopButton = AccessibilityUtils.findNodeByDescription(rootNode, "Buộc đóng")
+            val forceStopButton = AccessibilityUtils.findNodeByDescription(rootNode, "Force stop")
             if (forceStopButton != null) {
                 if (forceStopButton.isEnabled) {
-                    forceStopButton.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
-                    Log.d("OpenTiktok", "Clicked 'Buộc đóng' button.")
-                    clickConfirmOkButton(context,onComplete, skipBack)
+                    val rect = Rect()
+                    forceStopButton.getBoundsInScreen(rect)
+
+                    // Tính toán tọa độ trung tâm của button
+                    val clickX = rect.centerX().toFloat()
+                    val clickY = rect.centerY().toFloat()
+
+                    // Sử dụng gesture để click
+                    val accessibilityService = SaveInstance.accessibilityService
+                    if (accessibilityService != null) {
+                        accessibilityService.performClickGesture(clickX, clickY) {
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                clickConfirmOkButton(context, onComplete, skipBack)
+                            }, 3000) // Chờ 1 giây (có thể tăng/giảm tùy vào thử nghiệm)
+                        }
+                    } else {
+                        Log.e("OpenTiktok", "AccessibilityManager instance is null.")
+                    }
                 } else {
                     Log.d("OpenTiktok", "'Buộc đóng' button is disabled. Performing Back action.")
                     performBackAction {
@@ -217,7 +190,7 @@ class AppInfoManager {
                         clickForceStopButton(context, packageName, retryCount + 1, maxRetries, onComplete,skipBack)
                     }, 3000)
                 } else {
-                    Log.e("OpenTiktok", "Max retries reached. Unable to click 'Buộc đóng' button.")
+                    ApiClient.sendNotiToTelegram(CONFIG.MESSAGE_BUTTON_FORCE_STOP,TokenManager.getToken(context), context)
                 }
             }
         }
@@ -238,7 +211,6 @@ class AppInfoManager {
             val rootNode = accessibilityService?.rootInActiveWindow
 
             if (rootNode == null) {
-                Log.e("OpenTiktok", "Root node is null. Cannot search for 'OK' button.")
                 return
             }
 
@@ -248,11 +220,10 @@ class AppInfoManager {
                 if (!skipBack) {
                     performBackAction(onComplete)
                 } else {
-                    openTiktokWithRecent(context,"com.zhiliaoapp.musically")
+                    openAppWithText(context,"TikTok",CONFIG.PACKAGE_NAME_TIKTOK)
                     {
                         onComplete()
                     }
-
                 }
             } else {
                 Log.e("OpenTiktok", "Unable to find 'OK' button!")

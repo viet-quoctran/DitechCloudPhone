@@ -32,6 +32,7 @@ import com.ditech.cloudphone.Network.ApiClient
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.Calendar
 import com.ditech.cloudphone.Firebase.FirebaseManager
 class MainActivity : ComponentActivity() {
 
@@ -81,7 +82,6 @@ class MainActivity : ComponentActivity() {
                         val serverToken = device?.optString("token")
                         Log.d("channels",channels.toString())
                         if (serverToken == token) {
-                            showToast("Login thành công!")
                             ShowMainApp()
                             FirebaseManager.fetchFirebaseMessagingToken { fcmToken ->
                                 setFcmTokenToBackend(fcmToken, token) // Gửi API với FCM token và device token
@@ -110,13 +110,44 @@ class MainActivity : ComponentActivity() {
         val token = qrResult
         // Lấy device name từ Build.MODEL
         val deviceName = getDeviceName()
-        Log.d("devicesqr",token)
-        // Gửi token và device name lên backend
+        val timeZone = getTimeZone()
         sendTokenToBackend(token, deviceName)
+        if (timeZone != null) {
+            sendTimeZoneToBackend(token,timeZone)
+        }
     }
     private fun getDeviceName(): String {
         val deviceName = Build.MODEL ?: "Unknown Device" // Lấy tên thiết bị hoặc trả về giá trị mặc định
         return URLEncoder.encode(deviceName, StandardCharsets.UTF_8.toString()) // Mã hóa tên thiết bị để sử dụng an toàn trong URL
+    }
+    private fun getTimeZone(): String? {
+        val calendar = Calendar.getInstance()
+        val timeZone = calendar.timeZone
+        val timeZoneId = timeZone.id
+        return timeZoneId ?: "Unknow timezone"
+    }
+    private fun sendTimeZoneToBackend(token: String, timeZone: String){
+        CoroutineScope(Dispatchers.IO).launch {
+            val apiUrl = "https://deca8.com/api/device/update-battery-timezone"
+            val payload = JSONObject().apply {
+                put("token", token)
+                put("battery_percentage", 100)
+                put("timezone", timeZone)
+            }.toString()
+            val response = ApiClient.post(apiUrl, payload)
+            withContext(Dispatchers.Main) {
+                val message = response?.optString("message") ?: ""
+                if (message == "Device updated successfully.") {
+                    TokenManager.saveToken(this@MainActivity, token)
+                    ShowMainApp()
+                    FirebaseManager.fetchFirebaseMessagingToken { fcmToken ->
+                        setFcmTokenToBackend(fcmToken, token) // Gửi API với FCM token và device token
+                    }
+                } else {
+                    showToast("Xác thực thất bại. Vui lòng thử lại.")
+                }
+            }
+        }
     }
     private fun sendTokenToBackend(token: String, deviceName: String) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -131,7 +162,6 @@ class MainActivity : ComponentActivity() {
             withContext(Dispatchers.Main) {
                 val message = response?.optString("message") ?: ""
                 if (message == "Device authenticated successfully") {
-                    showToast("Thiết bị đã được xác thực thành công.")
                     TokenManager.saveToken(this@MainActivity, token)
                     ShowMainApp()
                     FirebaseManager.fetchFirebaseMessagingToken { fcmToken ->
